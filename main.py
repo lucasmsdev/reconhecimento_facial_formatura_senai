@@ -1,12 +1,12 @@
 import asyncio
-import base64
 import io
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Set
+from typing import Dict, Set, Optional
 
-import face_recognition
+import cv2
+import mediapipe as mp
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
@@ -32,26 +32,83 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 ALUNOS_DIR = Path("alunos_cadastrados")
 ALUNOS_DIR.mkdir(exist_ok=True)
 
+# MediaPipe Face Detection
+mp_face_detection = mp.solutions.face_detection
+face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
+
 # Global state
-known_face_encodings = []
-known_face_names = []
+student_face_images = {}  # {nome: [imagens processadas]}
 telao_connections: Set[WebSocket] = set()
 last_recognized: Dict[str, datetime] = {}
 DEBOUNCE_SECONDS = 3
+CONFIDENCE_THRESHOLD = 0.6
+
+
+def extract_face_features(image_array) -> Optional[np.ndarray]:
+    """Extrai features de um rosto usando MediaPipe."""
+    try:
+        # Converter para RGB
+        image_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+
+        # Detectar rostos
+        results = face_detection.process(image_rgb)
+
+        if not results.detections:
+            return None
+
+        # Pegar o primeiro rosto detectado
+        detection = results.detections[0]
+        bbox = detection.location_data.relative_bounding_box
+
+        # Converter coordenadas relativas para absolutas
+        h, w, _ = image_array.shape
+        x_min = max(0, int(bbox.xmin * w))
+        y_min = max(0, int(bbox.ymin * h))
+        x_max = min(w, int((bbox.xmin + bbox.width) * w))
+        y_max = min(h, int((bbox.ymin + bbox.height) * h))
+
+        # Extrair região do rosto
+        face_region = image_array[y_min:y_max, x_min:x_max]
+
+        if face_region.size == 0:
+            return None
+
+        # Redimensionar para tamanho fixo para consistência
+        face_resized = cv2.resize(face_region, (224, 224))
+
+        # Normalizar
+        face_normalized = face_resized.astype(np.float32) / 255.0
+
+        # Criar um "fingerprint" simples usando histogramas
+        hist_b = cv2.calcHist([face_resized], [0], None, [32], [0, 256])
+        hist_g = cv2.calcHist([face_resized], [1], None, [32], [0, 256])
+        hist_r = cv2.calcHist([face_resized], [2], None, [32], [0, 256])
+
+        # Concatenar histogramas
+        features = np.concatenate([hist_b.flatten(), hist_g.flatten(), hist_r.flatten()])
+        features = features / (np.linalg.norm(features) + 1e-6)  # Normalizar
+
+        return features
+    except Exception as e:
+        print(f"Erro ao extrair features: {e}")
+        return None
 
 
 def load_known_faces():
     """Carrega as faces conhecidas da pasta de alunos cadastrados."""
-    global known_face_encodings, known_face_names
+    global student_face_images
 
-    known_face_encodings = []
-    known_face_names = []
+    student_face_images = {}
 
     if not ALUNOS_DIR.exists():
         print(f"Pasta {ALUNOS_DIR} não encontrada!")
         return
 
-    image_files = list(ALUNOS_DIR.glob("*.jpg")) + list(ALUNOS_DIR.glob("*.png")) + list(ALUNOS_DIR.glob("*.jpeg"))
+    image_files = (
+        list(ALUNOS_DIR.glob("*.jpg"))
+        + list(ALUNOS_DIR.glob("*.png"))
+        + list(ALUNOS_DIR.glob("*.jpeg"))
+    )
 
     if not image_files:
         print(f"Nenhuma imagem encontrada em {ALUNOS_DIR}")
@@ -65,68 +122,56 @@ def load_known_faces():
             aluno_name = image_path.stem
 
             # Carregar imagem
-            image = face_recognition.load_image_file(str(image_path))
-            face_encodings = face_recognition.face_encodings(image)
+            image = cv2.imread(str(image_path))
+            if image is None:
+                print(f"✗ Erro ao ler: {image_path.name}")
+                continue
 
-            if face_encodings:
-                known_face_encodings.append(face_encodings[0])
-                known_face_names.append(aluno_name)
+            # Extrair features
+            features = extract_face_features(image)
+
+            if features is not None:
+                student_face_images[aluno_name] = features
                 print(f"✓ Carregado: {aluno_name}")
             else:
                 print(f"✗ Nenhum rosto detectado em: {image_path.name}")
         except Exception as e:
             print(f"✗ Erro ao processar {image_path.name}: {e}")
 
-    print(f"Total de alunos carregados: {len(known_face_encodings)}")
+    print(f"Total de alunos carregados: {len(student_face_images)}")
 
 
-def recognize_face(image_data: bytes) -> str | None:
+def recognize_face(image_data: bytes) -> Optional[str]:
     """
     Identifica um rosto em uma imagem.
     Retorna o nome do aluno ou None se não reconhecer.
     """
     try:
-        # Converter bytes para imagem PIL
+        # Converter bytes para imagem
         image = Image.open(io.BytesIO(image_data))
+        image_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-        # Converter para array numpy
-        image_array = np.array(image)
+        # Extrair features
+        face_features = extract_face_features(image_array)
 
-        # Se a imagem for RGBA, converter para RGB
-        if len(image_array.shape) == 3 and image_array.shape[2] == 4:
-            image_array = image_array[:, :, :3]
-
-        # Detectar faces e encodar
-        face_locations = face_recognition.face_locations(image_array)
-        face_encodings = face_recognition.face_encodings(image_array, face_locations)
-
-        if not face_encodings:
+        if face_features is None:
             return None
 
-        # Comparar com faces conhecidas
-        for face_encoding in face_encodings:
-            matches = face_recognition.compare_faces(
-                known_face_encodings,
-                face_encoding,
-                tolerance=0.6
-            )
-            distances = face_recognition.face_distance(
-                known_face_encodings,
-                face_encoding
+        # Comparar com rostos conhecidos
+        best_match = None
+        best_score = CONFIDENCE_THRESHOLD
+
+        for aluno_name, stored_features in student_face_images.items():
+            # Calcular similaridade (cosseno)
+            similarity = np.dot(face_features, stored_features) / (
+                np.linalg.norm(face_features) * np.linalg.norm(stored_features) + 1e-6
             )
 
-            if len(distances) > 0:
-                best_match_index = np.argmin(distances)
+            if similarity > best_score:
+                best_score = similarity
+                best_match = aluno_name
 
-                if matches[best_match_index]:
-                    name = known_face_names[best_match_index]
-                    confidence = 1 - distances[best_match_index]
-
-                    # Só reconhecer se confiança > 0.4
-                    if confidence > 0.4:
-                        return name
-
-        return None
+        return best_match
     except Exception as e:
         print(f"Erro ao reconhecer rosto: {e}")
         return None
@@ -179,7 +224,8 @@ async def startup_event():
 @app.get("/")
 async def root():
     """Página raiz com links para câmera e telão."""
-    return HTMLResponse("""
+    return HTMLResponse(
+        """
     <!DOCTYPE html>
     <html>
     <head>
@@ -243,7 +289,8 @@ async def root():
         </div>
     </body>
     </html>
-    """)
+    """
+    )
 
 
 @app.get("/camera")
@@ -301,4 +348,5 @@ async def websocket_telao(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
