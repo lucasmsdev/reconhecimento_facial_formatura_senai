@@ -14,7 +14,7 @@ def test_imports():
     required_modules = {
         'fastapi': 'FastAPI',
         'uvicorn': 'Uvicorn',
-        'face_recognition': 'face_recognition',
+        'mediapipe': 'MediaPipe',
         'cv2': 'OpenCV',
         'numpy': 'NumPy',
         'PIL': 'Pillow',
