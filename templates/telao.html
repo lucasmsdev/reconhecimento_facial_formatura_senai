@@ -96,37 +96,6 @@
             animation: pulse 0.6s ease-in-out;
         }
 
-        .status-bar {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: white;
-            padding: 15px 25px;
-            border: 2px solid #000;
-            border-radius: 5px;
-            color: #000;
-            font-size: 14px;
-            z-index: 1000;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-            vertical-align: middle;
-        }
-
-        .status-indicator.connected {
-            background: #c41e3a;
-            box-shadow: 0 0 10px #c41e3a;
-        }
-
-        .status-indicator.disconnected {
-            background: #999;
-            box-shadow: 0 0 10px #999;
-        }
 
         .default-view {
             text-align: center;
@@ -155,48 +124,6 @@
             color: #000;
         }
 
-        .controls {
-            position: fixed;
-            bottom: 20px;
-            left: 20px;
-            display: flex;
-            gap: 10px;
-            z-index: 999;
-        }
-
-        button {
-            padding: 10px 20px;
-            border: 2px solid #000;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .btn-home {
-            background: #c41e3a;
-            color: white;
-            border-color: #c41e3a;
-        }
-
-        .btn-home:hover {
-            background: white;
-            color: #c41e3a;
-            transform: translateY(-2px);
-        }
-
-        .btn-clear {
-            background: white;
-            color: #000;
-            border-color: #000;
-        }
-
-        .btn-clear:hover {
-            background: #000;
-            color: white;
-            transform: translateY(-2px);
-        }
 
         .history {
             position: fixed;
@@ -296,18 +223,8 @@
         </div>
     </div>
 
-    <div class="status-bar">
-        <span class="status-indicator disconnected" id="statusIndicator"></span>
-        <span id="statusText">Desconectado</span>
-    </div>
-
-    <div class="controls">
-        <button class="btn-home" onclick="goHome()">Voltar</button>
-        <button class="btn-clear" onclick="clearDisplay()">Limpar</button>
-    </div>
-
     <div class="history" id="history" style="display: none;">
-        <div class="history-title">Historico</div>
+        <div class="history-title">Formandos</div>
         <div id="historyList"></div>
     </div>
 
@@ -323,6 +240,7 @@
         let ws = null;
         let recognizedStudents = [];
         let displayTimeout = null;
+        let lastStudentName = null;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -332,7 +250,6 @@
 
             ws.onopen = () => {
                 console.log('Conectado ao WebSocket');
-                updateStatus(true);
             };
 
             ws.onmessage = (event) => {
@@ -346,25 +263,12 @@
 
             ws.onerror = (error) => {
                 console.error('Erro WebSocket:', error);
-                updateStatus(false);
             };
 
             ws.onclose = () => {
                 console.log('Desconectado do WebSocket');
-                updateStatus(false);
-
                 setTimeout(connectWebSocket, 3000);
             };
-        }
-
-        function updateStatus(connected) {
-            if (connected) {
-                statusIndicator.className = 'status-indicator connected';
-                statusText.textContent = 'Conectado';
-            } else {
-                statusIndicator.className = 'status-indicator disconnected';
-                statusText.textContent = 'Desconectado';
-            }
         }
 
         function displayStudent(nome) {
@@ -373,13 +277,17 @@
             }
 
             const now = new Date().toLocaleTimeString('pt-BR');
-            recognizedStudents.unshift({ nome, time: now });
 
-            if (recognizedStudents.length > 10) {
-                recognizedStudents.pop();
+            if (nome !== lastStudentName) {
+                recognizedStudents.unshift({ nome, time: now });
+
+                if (recognizedStudents.length > 5) {
+                    recognizedStudents.pop();
+                }
+
+                lastStudentName = nome;
+                updateHistoryDisplay();
             }
-
-            updateHistoryDisplay();
 
             studentName.textContent = nome;
             defaultView.style.display = 'none';
@@ -440,13 +348,6 @@
             }
         }
 
-        function goHome() {
-            if (ws) {
-                ws.close();
-            }
-            window.location.href = '/';
-        }
-
         window.addEventListener('load', () => {
             connectWebSocket();
         });
@@ -454,12 +355,6 @@
         window.addEventListener('beforeunload', () => {
             if (ws) {
                 ws.close();
-            }
-        });
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key.toLowerCase() === 'd') {
-                displayStudent('Joao Silva');
             }
         });
     </script>
