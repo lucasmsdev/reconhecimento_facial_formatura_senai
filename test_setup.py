@@ -14,7 +14,6 @@ def test_imports():
     required_modules = {
         'fastapi': 'FastAPI',
         'uvicorn': 'Uvicorn',
-        'mediapipe': 'MediaPipe',
         'cv2': 'OpenCV',
         'numpy': 'NumPy',
         'PIL': 'Pillow',

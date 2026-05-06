@@ -13,12 +13,6 @@ from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from starlette.middleware.cors import CORSMiddleware
 
-try:
-    from mediapipe.tasks import vision
-    from mediapipe.python.solutions import face_detection as mp_face_detection
-except ImportError:
-    from mediapipe.python.solutions import face_detection as mp_face_detection
-
 app = FastAPI(title="Sistema de Reconhecimento Facial")
 
 # CORS configuration
@@ -37,9 +31,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 ALUNOS_DIR = Path("alunos_cadastrados")
 ALUNOS_DIR.mkdir(exist_ok=True)
 
-# MediaPipe Face Detection
-face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
-
 # Global state
 student_face_images = {}  # {nome: [imagens processadas]}
 telao_connections: Set[WebSocket] = set()
@@ -48,40 +39,35 @@ DEBOUNCE_SECONDS = 3
 CONFIDENCE_THRESHOLD = 0.6
 
 
+# Load Haar Cascade classifier para detecção de faces
+face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+)
+
+
 def extract_face_features(image_array) -> Optional[np.ndarray]:
-    """Extrai features de um rosto usando MediaPipe."""
+    """Extrai features de um rosto usando OpenCV Haar Cascade."""
     try:
-        # Converter para RGB
-        image_rgb = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
+        # Converter para escala de cinza
+        gray = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
 
         # Detectar rostos
-        results = face_detection.process(image_rgb)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
 
-        if not results.detections:
+        if len(faces) == 0:
             return None
 
         # Pegar o primeiro rosto detectado
-        detection = results.detections[0]
-        bbox = detection.location_data.relative_bounding_box
-
-        # Converter coordenadas relativas para absolutas
-        h, w, _ = image_array.shape
-        x_min = max(0, int(bbox.xmin * w))
-        y_min = max(0, int(bbox.ymin * h))
-        x_max = min(w, int((bbox.xmin + bbox.width) * w))
-        y_max = min(h, int((bbox.ymin + bbox.height) * h))
+        x, y, w, h = faces[0]
 
         # Extrair região do rosto
-        face_region = image_array[y_min:y_max, x_min:x_max]
+        face_region = image_array[y : y + h, x : x + w]
 
         if face_region.size == 0:
             return None
 
         # Redimensionar para tamanho fixo para consistência
         face_resized = cv2.resize(face_region, (224, 224))
-
-        # Normalizar
-        face_normalized = face_resized.astype(np.float32) / 255.0
 
         # Criar um "fingerprint" simples usando histogramas
         hist_b = cv2.calcHist([face_resized], [0], None, [32], [0, 256])
