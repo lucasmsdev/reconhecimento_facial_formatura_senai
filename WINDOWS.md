@@ -26,20 +26,39 @@ pip install -r requirements.txt
 
 ---
 
-### 2. **Erro: "Microsoft C++ Build Tools"**
+### 2. **Erro: "dlib" ou "CMake" (Visual C++ Build Tools)"**
 
 #### Causa
-Algumas bibliotecas (como numpy, face-recognition) precisam compilar código C++.
+dlib (dependência de face-recognition) precisa compilar C++ no Windows.
 
-#### Solução
-Baixe e instale Microsoft C++ Build Tools (gratuito):
-https://visualstudio.microsoft.com/visual-cpp-build-tools/
+#### Solução A (Recomendada - Mais Rápida)
+Use Python 3.12 que tem wheels pré-compiladas:
 
-Siga os passos:
-1. Na instalação, selecione **"Desktop development with C++"**
-2. Clique em Install
-3. Reinicie o computador
-4. Tente `pip install -r requirements.txt` novamente
+```bash
+# 1. Desinstale Python 3.14
+# Painel de Controle → Programas → Desinstalar
+
+# 2. Baixe Python 3.12
+# https://www.python.org/downloads/release/python-3120/
+# IMPORTANTE: Marque "Add Python to PATH"
+
+# 3. Delete ambiente virtual antigo
+rmdir /s venv
+
+# 4. Crie novo com Python 3.12
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+#### Solução B (Mais Longa)
+Se quiser manter Python 3.14, instale Visual C++ Build Tools:
+
+1. Baixe: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+2. Na instalação, selecione **"Desktop development with C++"**
+3. Clique em Install (vai levar ~30 minutos)
+4. **Reinicie o computador**
+5. Tente novamente: `pip install -r requirements.txt`
 
 ---
 

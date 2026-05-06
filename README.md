@@ -15,7 +15,9 @@ Um sistema em tempo real que reconhece o rosto de alunos através da câmera e a
 
 ## 📋 Pré-requisitos
 
-- Python 3.8+
+- **Python 3.12** (recomendado) ou 3.11, 3.10, 3.9
+  - ⚠️ Python 3.14 pode exigir instalação de Visual C++ Build Tools
+  - ⚠️ Python < 3.9 não suportado
 - Navegador moderno com suporte a:
   - WebRTC (getUserMedia)
   - WebSocket
