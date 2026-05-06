@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: white;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -23,8 +23,9 @@
 
         .container {
             background: white;
-            border-radius: 15px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            border: 3px solid #000;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
             padding: 30px;
             max-width: 800px;
             width: 100%;
@@ -32,9 +33,11 @@
 
         h1 {
             text-align: center;
-            color: #333;
+            color: #000;
             margin-bottom: 20px;
             font-size: 28px;
+            border-bottom: 3px solid #c41e3a;
+            padding-bottom: 15px;
         }
 
         .video-container {
@@ -43,7 +46,8 @@
             max-width: 600px;
             margin: 0 auto 20px;
             background: #000;
-            border-radius: 10px;
+            border: 2px solid #c41e3a;
+            border-radius: 5px;
             overflow: hidden;
             aspect-ratio: 4/3;
         }
@@ -55,11 +59,11 @@
         }
 
         .status-bar {
-            background: #f0f0f0;
+            background: #f5f5f5;
             padding: 15px;
-            border-radius: 10px;
+            border-radius: 5px;
             margin-bottom: 20px;
-            border-left: 4px solid #667eea;
+            border-left: 5px solid #c41e3a;
         }
 
         .status-item {
@@ -67,11 +71,12 @@
             justify-content: space-between;
             margin: 8px 0;
             font-size: 14px;
+            color: #000;
         }
 
         .status-label {
             font-weight: 600;
-            color: #555;
+            color: #000;
         }
 
         .status-value {
@@ -79,12 +84,12 @@
         }
 
         .status-value.active {
-            color: #27ae60;
+            color: #c41e3a;
             font-weight: bold;
         }
 
         .status-value.inactive {
-            color: #e74c3c;
+            color: #666;
             font-weight: bold;
         }
 
@@ -98,7 +103,7 @@
         button {
             padding: 12px 24px;
             font-size: 14px;
-            border: none;
+            border: 2px solid #000;
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -106,33 +111,39 @@
         }
 
         .btn-primary {
-            background: #667eea;
+            background: #c41e3a;
             color: white;
+            border-color: #c41e3a;
         }
 
         .btn-primary:hover:not(:disabled) {
-            background: #5568d3;
+            background: white;
+            color: #c41e3a;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 5px 15px rgba(196, 30, 58, 0.4);
         }
 
         .btn-secondary {
-            background: #95a5a6;
-            color: white;
+            background: white;
+            color: #000;
+            border-color: #000;
         }
 
         .btn-secondary:hover:not(:disabled) {
-            background: #7f8c8d;
+            background: #000;
+            color: white;
             transform: translateY(-2px);
         }
 
         .btn-danger {
-            background: #e74c3c;
+            background: #c41e3a;
             color: white;
+            border-color: #c41e3a;
         }
 
         .btn-danger:hover:not(:disabled) {
-            background: #c0392b;
+            background: white;
+            color: #c41e3a;
             transform: translateY(-2px);
         }
 
@@ -142,18 +153,18 @@
         }
 
         .info-box {
-            background: #e8f4f8;
-            border-left: 4px solid #3498db;
+            background: #f5f5f5;
+            border-left: 5px solid #c41e3a;
             padding: 15px;
             border-radius: 5px;
             margin-top: 20px;
             font-size: 14px;
-            color: #333;
+            color: #000;
             line-height: 1.6;
         }
 
         .info-box strong {
-            color: #2980b9;
+            color: #c41e3a;
         }
 
         canvas {
@@ -163,10 +174,11 @@
         .stats {
             margin-top: 15px;
             padding: 10px;
-            background: #f9f9f9;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 12px;
-            color: #666;
+            color: #000;
             text-align: center;
         }
 
@@ -191,7 +203,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>📷 Câmera de Reconhecimento</h1>
+        <h1>Câmera de Reconhecimento</h1>
 
         <div class="video-container">
             <video id="video" autoplay playsinline></video>
@@ -229,7 +241,7 @@
         </div>
 
         <div class="info-box">
-            <strong>ℹ️ Instruções:</strong><br>
+            <strong>Instruções:</strong><br>
             1. Clique em "Iniciar Câmera" para acessar sua webcam<br>
             2. Clique em "Iniciar Captura" para começar o reconhecimento facial<br>
             3. Fique em frente à câmera para ser reconhecido<br>
@@ -309,17 +321,10 @@
             frameCounter = 0;
 
             captureBtn.textContent = 'Parar Captura';
-            captureBtn.classList.remove('btn-primary');
-            captureBtn.classList.add('btn-danger');
             updateStatus('captureStatus', 'active', 'Ativa');
 
-            // Capturar a cada 500ms (2 frames/segundo)
             captureInterval = setInterval(captureFrame, 500);
-
-            // Atualizar FPS a cada segundo
             setInterval(updateFPS, 1000);
-
-            // Atualizar tempo decorrido
             setInterval(updateElapsedTime, 1000);
         }
 
@@ -328,8 +333,6 @@
             clearInterval(captureInterval);
 
             captureBtn.textContent = 'Iniciar Captura';
-            captureBtn.classList.add('btn-primary');
-            captureBtn.classList.remove('btn-danger');
             updateStatus('captureStatus', 'inactive', 'Parada');
         }
 
@@ -426,7 +429,6 @@
             window.location.href = '/';
         }
 
-        // Limpar ao sair da página
         window.addEventListener('beforeunload', () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());

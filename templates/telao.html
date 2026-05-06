@@ -13,7 +13,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: white;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -45,8 +45,8 @@
         .student-name {
             font-size: 120px;
             font-weight: bold;
-            color: white;
-            text-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            color: #c41e3a;
+            text-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
             margin: 0;
             text-align: center;
             word-wrap: break-word;
@@ -57,8 +57,8 @@
 
         .welcome-text {
             font-size: 48px;
-            color: rgba(255, 255, 255, 0.9);
-            text-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            color: #000;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             margin-bottom: 20px;
             animation: fadeIn 0.5s ease-out;
         }
@@ -96,18 +96,17 @@
             animation: pulse 0.6s ease-in-out;
         }
 
-        /* Status bar */
         .status-bar {
             position: fixed;
             top: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: white;
             padding: 15px 25px;
-            border-radius: 10px;
-            color: white;
+            border: 2px solid #000;
+            border-radius: 5px;
+            color: #000;
             font-size: 14px;
             z-index: 1000;
-            border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
         .status-indicator {
@@ -120,41 +119,42 @@
         }
 
         .status-indicator.connected {
-            background: #27ae60;
-            box-shadow: 0 0 10px #27ae60;
+            background: #c41e3a;
+            box-shadow: 0 0 10px #c41e3a;
         }
 
         .status-indicator.disconnected {
-            background: #e74c3c;
-            box-shadow: 0 0 10px #e74c3c;
+            background: #999;
+            box-shadow: 0 0 10px #999;
         }
 
-        /* Default view */
         .default-view {
             text-align: center;
-            color: white;
+            color: #000;
         }
 
         .default-title {
             font-size: 60px;
             font-weight: bold;
             margin-bottom: 30px;
-            text-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            color: #000;
         }
 
         .default-subtitle {
             font-size: 28px;
             margin-bottom: 50px;
-            opacity: 0.9;
+            opacity: 0.8;
+            color: #000;
         }
 
         .default-instructions {
             font-size: 20px;
-            opacity: 0.8;
+            opacity: 0.7;
             line-height: 1.8;
+            color: #000;
         }
 
-        /* Controls */
         .controls {
             position: fixed;
             bottom: 20px;
@@ -166,7 +166,7 @@
 
         button {
             padding: 10px 20px;
-            border: none;
+            border: 2px solid #000;
             border-radius: 5px;
             cursor: pointer;
             font-size: 14px;
@@ -175,47 +175,50 @@
         }
 
         .btn-home {
-            background: #667eea;
+            background: #c41e3a;
             color: white;
+            border-color: #c41e3a;
         }
 
         .btn-home:hover {
-            background: #5568d3;
+            background: white;
+            color: #c41e3a;
             transform: translateY(-2px);
         }
 
         .btn-clear {
-            background: #95a5a6;
-            color: white;
+            background: white;
+            color: #000;
+            border-color: #000;
         }
 
         .btn-clear:hover {
-            background: #7f8c8d;
+            background: #000;
+            color: white;
             transform: translateY(-2px);
         }
 
-        /* Recognition history */
         .history {
             position: fixed;
             bottom: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: white;
             padding: 15px;
-            border-radius: 10px;
-            color: white;
+            border: 2px solid #000;
+            border-radius: 5px;
+            color: #000;
             font-size: 12px;
             max-width: 300px;
             max-height: 200px;
             overflow-y: auto;
             z-index: 999;
-            border: 2px solid rgba(255, 255, 255, 0.2);
         }
 
         .history-title {
             font-weight: bold;
             margin-bottom: 10px;
             padding-bottom: 10px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            border-bottom: 2px solid #c41e3a;
         }
 
         .history-item {
@@ -278,7 +281,7 @@
     <div class="telao-container">
         <div class="welcome-section">
             <div class="default-view" id="defaultView">
-                <div class="default-title">👤 Reconhecimento Facial</div>
+                <div class="default-title">Reconhecimento Facial</div>
                 <div class="default-subtitle">Aguardando alunos...</div>
                 <div class="default-instructions">
                     A página da câmera está ativa?<br>
@@ -287,27 +290,24 @@
             </div>
 
             <div id="welcomeSection" style="display: none;">
-                <div class="welcome-text">Bem-vindo!</div>
+                <div class="welcome-text">Bem-vindo</div>
                 <h1 class="student-name" id="studentName"></h1>
             </div>
         </div>
     </div>
 
-    <!-- Status bar -->
     <div class="status-bar">
         <span class="status-indicator disconnected" id="statusIndicator"></span>
         <span id="statusText">Desconectado</span>
     </div>
 
-    <!-- Controls -->
     <div class="controls">
-        <button class="btn-home" onclick="goHome()">🏠 Voltar</button>
+        <button class="btn-home" onclick="goHome()">Voltar</button>
         <button class="btn-clear" onclick="clearDisplay()">Limpar</button>
     </div>
 
-    <!-- Recognition history -->
     <div class="history" id="history" style="display: none;">
-        <div class="history-title">📋 Histórico</div>
+        <div class="history-title">Historico</div>
         <div id="historyList"></div>
     </div>
 
@@ -331,7 +331,7 @@
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
-                console.log('✓ Conectado ao WebSocket');
+                console.log('Conectado ao WebSocket');
                 updateStatus(true);
             };
 
@@ -350,10 +350,9 @@
             };
 
             ws.onclose = () => {
-                console.log('✗ Desconectado do WebSocket');
+                console.log('Desconectado do WebSocket');
                 updateStatus(false);
 
-                // Tentar reconectar a cada 3 segundos
                 setTimeout(connectWebSocket, 3000);
             };
         }
@@ -369,12 +368,10 @@
         }
 
         function displayStudent(nome) {
-            // Limpar timeout anterior se houver
             if (displayTimeout) {
                 clearTimeout(displayTimeout);
             }
 
-            // Adicionar ao histórico
             const now = new Date().toLocaleTimeString('pt-BR');
             recognizedStudents.unshift({ nome, time: now });
 
@@ -384,20 +381,16 @@
 
             updateHistoryDisplay();
 
-            // Mostrar o nome
             studentName.textContent = nome;
             defaultView.style.display = 'none';
             welcomeSection.style.display = 'block';
 
-            // Adicionar animação de pulse
             studentName.classList.remove('pulse');
-            void studentName.offsetWidth; // Trigger reflow
+            void studentName.offsetWidth;
             studentName.classList.add('pulse');
 
-            // Falar o nome
             speakName(nome);
 
-            // Limpar após 5 segundos
             displayTimeout = setTimeout(clearDisplay, 5000);
         }
 
@@ -419,14 +412,12 @@
 
             history.style.display = 'block';
             historyList.innerHTML = recognizedStudents
-                .map(item => `<div class="history-item">🕐 ${item.time}<br>👤 ${item.nome}</div>`)
+                .map(item => `<div class="history-item">${item.time}<br>${item.nome}</div>`)
                 .join('');
         }
 
         function speakName(nome) {
-            // Usar Web Speech API
             if ('speechSynthesis' in window) {
-                // Cancelar fala anterior se houver
                 window.speechSynthesis.cancel();
 
                 const utterance = new SpeechSynthesisUtterance(nome);
@@ -438,14 +429,14 @@
                 window.speechSynthesis.speak(utterance);
 
                 utterance.onend = () => {
-                    console.log('Fala concluída');
+                    console.log('Fala concluida');
                 };
 
                 utterance.onerror = (event) => {
                     console.error('Erro ao falar:', event.error);
                 };
             } else {
-                console.warn('Web Speech API não suportada neste navegador');
+                console.warn('Web Speech API nao suportada neste navegador');
             }
         }
 
@@ -456,22 +447,19 @@
             window.location.href = '/';
         }
 
-        // Conectar ao WebSocket quando a página carregar
         window.addEventListener('load', () => {
             connectWebSocket();
         });
 
-        // Desconectar ao sair da página
         window.addEventListener('beforeunload', () => {
             if (ws) {
                 ws.close();
             }
         });
 
-        // Debug: tecla 'D' para simular um reconhecimento (para testes)
         document.addEventListener('keydown', (e) => {
             if (e.key.toLowerCase() === 'd') {
-                displayStudent('João Silva');
+                displayStudent('Joao Silva');
             }
         });
     </script>

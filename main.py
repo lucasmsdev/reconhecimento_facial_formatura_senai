@@ -85,7 +85,8 @@ def extract_face_features(image_array) -> Optional[np.ndarray]:
 
 
 def load_known_faces():
-    """Carrega as faces conhecidas da pasta de alunos cadastrados."""
+    """Carrega as faces conhecidas da pasta de alunos cadastrados.
+    Busca por subpastas nomeadas com o nome do aluno."""
     global student_face_images
 
     student_face_images = {}
@@ -94,41 +95,83 @@ def load_known_faces():
         print(f"Pasta {ALUNOS_DIR} não encontrada!")
         return
 
-    image_files = (
-        list(ALUNOS_DIR.glob("*.jpg"))
-        + list(ALUNOS_DIR.glob("*.png"))
-        + list(ALUNOS_DIR.glob("*.jpeg"))
-    )
+    # Buscar subpastas (cada pasta é um aluno)
+    student_folders = [d for d in ALUNOS_DIR.iterdir() if d.is_dir()]
 
-    if not image_files:
-        print(f"Nenhuma imagem encontrada em {ALUNOS_DIR}")
-        return
+    if not student_folders:
+        # Se não houver pastas, buscar imagens diretamente
+        image_files = (
+            list(ALUNOS_DIR.glob("*.jpg"))
+            + list(ALUNOS_DIR.glob("*.png"))
+            + list(ALUNOS_DIR.glob("*.jpeg"))
+        )
 
-    print(f"Carregando {len(image_files)} imagens...")
+        if not image_files:
+            print(f"Nenhuma imagem encontrada em {ALUNOS_DIR}")
+            return
 
-    for image_path in image_files:
-        try:
-            # Nome do aluno é o nome do arquivo sem extensão
-            aluno_name = image_path.stem
+        print(f"Carregando {len(image_files)} imagens...")
 
-            # Carregar imagem
-            image = cv2.imread(str(image_path))
-            if image is None:
-                print(f"✗ Erro ao ler: {image_path.name}")
+        for image_path in image_files:
+            try:
+                aluno_name = image_path.stem
+                image = cv2.imread(str(image_path))
+                if image is None:
+                    print(f"Erro ao ler: {image_path.name}")
+                    continue
+
+                features = extract_face_features(image)
+                if features is not None:
+                    student_face_images[aluno_name] = features
+                    print(f"Carregado: {aluno_name}")
+                else:
+                    print(f"Nenhum rosto detectado em: {image_path.name}")
+            except Exception as e:
+                print(f"Erro ao processar {image_path.name}: {e}")
+    else:
+        # Carregar imagens de subpastas
+        print(f"Carregando imagens de {len(student_folders)} aluno(s)...")
+
+        for student_folder in student_folders:
+            aluno_name = student_folder.name
+            print(f"\nAluno: {aluno_name}")
+
+            image_files = (
+                list(student_folder.glob("*.jpg"))
+                + list(student_folder.glob("*.png"))
+                + list(student_folder.glob("*.jpeg"))
+            )
+
+            if not image_files:
+                print(f"  Nenhuma imagem encontrada em {aluno_name}/")
                 continue
 
-            # Extrair features
-            features = extract_face_features(image)
+            features_list = []
 
-            if features is not None:
-                student_face_images[aluno_name] = features
-                print(f"✓ Carregado: {aluno_name}")
+            for image_path in image_files:
+                try:
+                    image = cv2.imread(str(image_path))
+                    if image is None:
+                        print(f"  Erro ao ler: {image_path.name}")
+                        continue
+
+                    features = extract_face_features(image)
+                    if features is not None:
+                        features_list.append(features)
+                        print(f"  Carregado: {image_path.name}")
+                    else:
+                        print(f"  Nenhum rosto detectado em: {image_path.name}")
+                except Exception as e:
+                    print(f"  Erro ao processar {image_path.name}: {e}")
+
+            if features_list:
+                # Usar a média de todas as features
+                student_face_images[aluno_name] = np.mean(features_list, axis=0)
+                print(f"  Total de {len(features_list)} foto(s) carregada(s)")
             else:
-                print(f"✗ Nenhum rosto detectado em: {image_path.name}")
-        except Exception as e:
-            print(f"✗ Erro ao processar {image_path.name}: {e}")
+                print(f"  Nenhuma foto valida para {aluno_name}")
 
-    print(f"Total de alunos carregados: {len(student_face_images)}")
+    print(f"\nTotal de alunos carregados: {len(student_face_images)}")
 
 
 def recognize_face(image_data: bytes) -> Optional[str]:
@@ -229,18 +272,21 @@ async def root():
                 align-items: center;
                 height: 100vh;
                 margin: 0;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: white;
             }
             .container {
                 text-align: center;
                 background: white;
                 padding: 40px;
+                border: 3px solid #000;
                 border-radius: 10px;
                 box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             }
             h1 {
-                color: #333;
+                color: #000;
                 margin-bottom: 30px;
+                border-bottom: 3px solid #c41e3a;
+                padding-bottom: 15px;
             }
             .buttons {
                 display: flex;
@@ -254,18 +300,30 @@ async def root():
                 text-decoration: none;
                 border-radius: 5px;
                 transition: transform 0.2s, box-shadow 0.2s;
+                border: 2px solid #000;
+                font-weight: 600;
             }
             .btn-camera {
-                background: #667eea;
+                background: #c41e3a;
                 color: white;
+                border-color: #c41e3a;
+            }
+            .btn-camera:hover {
+                background: white;
+                color: #c41e3a;
             }
             .btn-telao {
-                background: #764ba2;
+                background: #c41e3a;
                 color: white;
+                border-color: #c41e3a;
+            }
+            .btn-telao:hover {
+                background: white;
+                color: #c41e3a;
             }
             a:hover {
                 transform: translateY(-2px);
-                box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+                box-shadow: 0 5px 15px rgba(196, 30, 58, 0.3);
             }
         </style>
     </head>
@@ -273,8 +331,8 @@ async def root():
         <div class="container">
             <h1>Sistema de Reconhecimento Facial</h1>
             <div class="buttons">
-                <a href="/camera" class="btn-camera">📷 Câmera</a>
-                <a href="/telao" class="btn-telao">📺 Telão</a>
+                <a href="/camera" class="btn-camera">Câmera</a>
+                <a href="/telao" class="btn-telao">Telão</a>
             </div>
         </div>
     </body>
