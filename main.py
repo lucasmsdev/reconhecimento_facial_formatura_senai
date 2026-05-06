@@ -6,13 +6,18 @@ from pathlib import Path
 from typing import Dict, Set, Optional
 
 import cv2
-import mediapipe as mp
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from starlette.middleware.cors import CORSMiddleware
+
+try:
+    from mediapipe.tasks import vision
+    from mediapipe.python.solutions import face_detection as mp_face_detection
+except ImportError:
+    from mediapipe.python.solutions import face_detection as mp_face_detection
 
 app = FastAPI(title="Sistema de Reconhecimento Facial")
 
@@ -33,7 +38,6 @@ ALUNOS_DIR = Path("alunos_cadastrados")
 ALUNOS_DIR.mkdir(exist_ok=True)
 
 # MediaPipe Face Detection
-mp_face_detection = mp.solutions.face_detection
 face_detection = mp_face_detection.FaceDetection(min_detection_confidence=0.5)
 
 # Global state
