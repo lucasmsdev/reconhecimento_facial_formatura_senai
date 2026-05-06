@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telão - Reconhecimento Facial</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .telao-container {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .welcome-section {
+            text-align: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+
+        .student-name {
+            font-size: 120px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            margin: 0;
+            text-align: center;
+            word-wrap: break-word;
+            max-width: 100%;
+            padding: 20px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        .welcome-text {
+            font-size: 48px;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        .pulse {
+            animation: pulse 0.6s ease-in-out;
+        }
+
+        /* Status bar */
+        .status-bar {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 25px;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+            z-index: 1000;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .status-indicator.connected {
+            background: #27ae60;
+            box-shadow: 0 0 10px #27ae60;
+        }
+
+        .status-indicator.disconnected {
+            background: #e74c3c;
+            box-shadow: 0 0 10px #e74c3c;
+        }
+
+        /* Default view */
+        .default-view {
+            text-align: center;
+            color: white;
+        }
+
+        .default-title {
+            font-size: 60px;
+            font-weight: bold;
+            margin-bottom: 30px;
+            text-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .default-subtitle {
+            font-size: 28px;
+            margin-bottom: 50px;
+            opacity: 0.9;
+        }
+
+        .default-instructions {
+            font-size: 20px;
+            opacity: 0.8;
+            line-height: 1.8;
+        }
+
+        /* Controls */
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 999;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-home {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-home:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .btn-clear {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-clear:hover {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+
+        /* Recognition history */
+        .history {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            font-size: 12px;
+            max-width: 300px;
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 999;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .history-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .history-item {
+            padding: 5px 0;
+            opacity: 0.9;
+        }
+
+        @media (max-width: 1200px) {
+            .student-name {
+                font-size: 80px;
+            }
+
+            .welcome-text {
+                font-size: 36px;
+            }
+
+            .default-title {
+                font-size: 48px;
+            }
+
+            .default-subtitle {
+                font-size: 20px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .student-name {
+                font-size: 60px;
+            }
+
+            .welcome-text {
+                font-size: 28px;
+            }
+
+            .default-title {
+                font-size: 36px;
+            }
+
+            .default-subtitle {
+                font-size: 16px;
+            }
+
+            .default-instructions {
+                font-size: 14px;
+            }
+
+            .status-bar {
+                font-size: 12px;
+                padding: 10px 15px;
+            }
+
+            .history {
+                font-size: 11px;
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="telao-container">
+        <div class="welcome-section">
+            <div class="default-view" id="defaultView">
+                <div class="default-title">👤 Reconhecimento Facial</div>
+                <div class="default-subtitle">Aguardando alunos...</div>
+                <div class="default-instructions">
+                    A página da câmera está ativa?<br>
+                    Aproxime-se da câmera para ser reconhecido!
+                </div>
+            </div>
+
+            <div id="welcomeSection" style="display: none;">
+                <div class="welcome-text">Bem-vindo!</div>
+                <h1 class="student-name" id="studentName"></h1>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+        <span class="status-indicator disconnected" id="statusIndicator"></span>
+        <span id="statusText">Desconectado</span>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+        <button class="btn-home" onclick="goHome()">🏠 Voltar</button>
+        <button class="btn-clear" onclick="clearDisplay()">Limpar</button>
+    </div>
+
+    <!-- Recognition history -->
+    <div class="history" id="history" style="display: none;">
+        <div class="history-title">📋 Histórico</div>
+        <div id="historyList"></div>
+    </div>
+
+    <script>
+        const defaultView = document.getElementById('defaultView');
+        const welcomeSection = document.getElementById('welcomeSection');
+        const studentName = document.getElementById('studentName');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const statusText = document.getElementById('statusText');
+        const history = document.getElementById('history');
+        const historyList = document.getElementById('historyList');
+
+        let ws = null;
+        let recognizedStudents = [];
+        let displayTimeout = null;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/telao`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('✓ Conectado ao WebSocket');
+                updateStatus(true);
+            };
+
+            ws.onmessage = (event) => {
+                console.log('Mensagem recebida:', event.data);
+
+                if (event.data.startsWith('ALUNO:')) {
+                    const nome = event.data.substring(6);
+                    displayStudent(nome);
+                }
+            };
+
+            ws.onerror = (error) => {
+                console.error('Erro WebSocket:', error);
+                updateStatus(false);
+            };
+
+            ws.onclose = () => {
+                console.log('✗ Desconectado do WebSocket');
+                updateStatus(false);
+
+                // Tentar reconectar a cada 3 segundos
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        function updateStatus(connected) {
+            if (connected) {
+                statusIndicator.className = 'status-indicator connected';
+                statusText.textContent = 'Conectado';
+            } else {
+                statusIndicator.className = 'status-indicator disconnected';
+                statusText.textContent = 'Desconectado';
+            }
+        }
+
+        function displayStudent(nome) {
+            // Limpar timeout anterior se houver
+            if (displayTimeout) {
+                clearTimeout(displayTimeout);
+            }
+
+            // Adicionar ao histórico
+            const now = new Date().toLocaleTimeString('pt-BR');
+            recognizedStudents.unshift({ nome, time: now });
+
+            if (recognizedStudents.length > 10) {
+                recognizedStudents.pop();
+            }
+
+            updateHistoryDisplay();
+
+            // Mostrar o nome
+            studentName.textContent = nome;
+            defaultView.style.display = 'none';
+            welcomeSection.style.display = 'block';
+
+            // Adicionar animação de pulse
+            studentName.classList.remove('pulse');
+            void studentName.offsetWidth; // Trigger reflow
+            studentName.classList.add('pulse');
+
+            // Falar o nome
+            speakName(nome);
+
+            // Limpar após 5 segundos
+            displayTimeout = setTimeout(clearDisplay, 5000);
+        }
+
+        function clearDisplay() {
+            defaultView.style.display = 'block';
+            welcomeSection.style.display = 'none';
+            studentName.classList.remove('pulse');
+
+            if (displayTimeout) {
+                clearTimeout(displayTimeout);
+            }
+        }
+
+        function updateHistoryDisplay() {
+            if (recognizedStudents.length === 0) {
+                history.style.display = 'none';
+                return;
+            }
+
+            history.style.display = 'block';
+            historyList.innerHTML = recognizedStudents
+                .map(item => `<div class="history-item">🕐 ${item.time}<br>👤 ${item.nome}</div>`)
+                .join('');
+        }
+
+        function speakName(nome) {
+            // Usar Web Speech API
+            if ('speechSynthesis' in window) {
+                // Cancelar fala anterior se houver
+                window.speechSynthesis.cancel();
+
+                const utterance = new SpeechSynthesisUtterance(nome);
+                utterance.lang = 'pt-BR';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+
+                window.speechSynthesis.speak(utterance);
+
+                utterance.onend = () => {
+                    console.log('Fala concluída');
+                };
+
+                utterance.onerror = (event) => {
+                    console.error('Erro ao falar:', event.error);
+                };
+            } else {
+                console.warn('Web Speech API não suportada neste navegador');
+            }
+        }
+
+        function goHome() {
+            if (ws) {
+                ws.close();
+            }
+            window.location.href = '/';
+        }
+
+        // Conectar ao WebSocket quando a página carregar
+        window.addEventListener('load', () => {
+            connectWebSocket();
+        });
+
+        // Desconectar ao sair da página
+        window.addEventListener('beforeunload', () => {
+            if (ws) {
+                ws.close();
+            }
+        });
+
+        // Debug: tecla 'D' para simular um reconhecimento (para testes)
+        document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'd') {
+                displayStudent('João Silva');
+            }
+        });
+    </script>
+</body>
+</html>

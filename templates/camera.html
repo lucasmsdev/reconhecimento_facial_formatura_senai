@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Câmera - Reconhecimento Facial</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 30px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto 20px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 4/3;
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .status-bar {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .status-value {
+            color: #333;
+        }
+
+        .status-value.active {
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .status-value.inactive {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 14px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #7f8c8d;
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #c0392b;
+            transform: translateY(-2px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .info-box {
+            background: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .info-box strong {
+            color: #2980b9;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .stats {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .controls {
+                flex-direction: column;
+            }
+
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📷 Câmera de Reconhecimento</h1>
+
+        <div class="video-container">
+            <video id="video" autoplay playsinline></video>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-label">Câmera:</span>
+                <span class="status-value inactive" id="cameraStatus">Desconectada</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Captura:</span>
+                <span class="status-value inactive" id="captureStatus">Parada</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Conexão Backend:</span>
+                <span class="status-value inactive" id="backendStatus">Desconectada</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">FPS:</span>
+                <span class="status-value" id="fpsStatus">0</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn-primary" id="startBtn" onclick="startCamera()">Iniciar Câmera</button>
+            <button class="btn-primary" id="captureBtn" onclick="toggleCapture()" disabled>Iniciar Captura</button>
+            <button class="btn-danger" id="stopBtn" onclick="stopCamera()" disabled>Parar</button>
+            <button class="btn-secondary" onclick="goHome()">Voltar</button>
+        </div>
+
+        <div class="stats">
+            <div>Frames enviados: <span id="frameCount">0</span></div>
+            <div>Tempo decorrido: <span id="elapsedTime">00:00</span></div>
+        </div>
+
+        <div class="info-box">
+            <strong>ℹ️ Instruções:</strong><br>
+            1. Clique em "Iniciar Câmera" para acessar sua webcam<br>
+            2. Clique em "Iniciar Captura" para começar o reconhecimento facial<br>
+            3. Fique em frente à câmera para ser reconhecido<br>
+            4. Seu nome será anunciado no Telão quando for reconhecido
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        const startBtn = document.getElementById('startBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const stopBtn = document.getElementById('stopBtn');
+
+        const cameraStatus = document.getElementById('cameraStatus');
+        const captureStatus = document.getElementById('captureStatus');
+        const backendStatus = document.getElementById('backendStatus');
+        const fpsStatus = document.getElementById('fpsStatus');
+        const frameCount = document.getElementById('frameCount');
+        const elapsedTime = document.getElementById('elapsedTime');
+
+        let stream = null;
+        let isCapturing = false;
+        let captureInterval = null;
+        let framesSent = 0;
+        let startTime = null;
+        let lastFrameTime = performance.now();
+        let fps = 0;
+        let frameCounter = 0;
+
+        async function startCamera() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+
+                video.srcObject = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                };
+
+                updateStatus('cameraStatus', 'active', 'Conectada');
+                startBtn.disabled = true;
+                captureBtn.disabled = false;
+                stopBtn.disabled = false;
+
+                checkBackendConnection();
+            } catch (error) {
+                console.error('Erro ao acessar câmera:', error);
+                updateStatus('cameraStatus', 'inactive', 'Erro: ' + error.message);
+                alert('Erro ao acessar a câmera. Verifique as permissões.');
+            }
+        }
+
+        function toggleCapture() {
+            if (isCapturing) {
+                stopCapture();
+            } else {
+                startCapture();
+            }
+        }
+
+        function startCapture() {
+            if (!stream) {
+                alert('Inicie a câmera primeiro!');
+                return;
+            }
+
+            isCapturing = true;
+            startTime = Date.now();
+            framesSent = 0;
+            frameCounter = 0;
+
+            captureBtn.textContent = 'Parar Captura';
+            captureBtn.classList.remove('btn-primary');
+            captureBtn.classList.add('btn-danger');
+            updateStatus('captureStatus', 'active', 'Ativa');
+
+            // Capturar a cada 500ms (2 frames/segundo)
+            captureInterval = setInterval(captureFrame, 500);
+
+            // Atualizar FPS a cada segundo
+            setInterval(updateFPS, 1000);
+
+            // Atualizar tempo decorrido
+            setInterval(updateElapsedTime, 1000);
+        }
+
+        function stopCapture() {
+            isCapturing = false;
+            clearInterval(captureInterval);
+
+            captureBtn.textContent = 'Iniciar Captura';
+            captureBtn.classList.add('btn-primary');
+            captureBtn.classList.remove('btn-danger');
+            updateStatus('captureStatus', 'inactive', 'Parada');
+        }
+
+        function captureFrame() {
+            if (!isCapturing || !video.readyState === video.HAVE_ENOUGH_DATA) return;
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async (blob) => {
+                try {
+                    const formData = new FormData();
+                    formData.append('file', blob, 'frame.jpg');
+
+                    const response = await fetch('/api/recognize', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        framesSent++;
+                        frameCount.textContent = framesSent;
+                        updateStatus('backendStatus', 'active', 'Conectada');
+                    } else {
+                        updateStatus('backendStatus', 'inactive', 'Erro');
+                    }
+                } catch (error) {
+                    console.error('Erro ao enviar frame:', error);
+                    updateStatus('backendStatus', 'inactive', 'Erro');
+                }
+            }, 'image/jpeg', 0.8);
+
+            frameCounter++;
+        }
+
+        function updateFPS() {
+            fps = frameCounter;
+            frameCounter = 0;
+            fpsStatus.textContent = fps;
+        }
+
+        function updateElapsedTime() {
+            if (!startTime) return;
+
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            const minutes = Math.floor(elapsed / 60);
+            const seconds = elapsed % 60;
+
+            elapsedTime.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function stopCamera() {
+            stopCapture();
+
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+
+            video.srcObject = null;
+            updateStatus('cameraStatus', 'inactive', 'Desconectada');
+
+            startBtn.disabled = false;
+            captureBtn.disabled = true;
+            stopBtn.disabled = true;
+
+            framesSent = 0;
+            frameCount.textContent = '0';
+            elapsedTime.textContent = '00:00';
+        }
+
+        function updateStatus(elementId, className, text) {
+            const element = document.getElementById(elementId);
+            element.textContent = text;
+            element.className = 'status-value ' + className;
+        }
+
+        async function checkBackendConnection() {
+            try {
+                const response = await fetch('/api/recognize', {
+                    method: 'POST',
+                    body: new FormData()
+                });
+                updateStatus('backendStatus', 'active', 'Conectada');
+            } catch (error) {
+                updateStatus('backendStatus', 'inactive', 'Desconectada');
+            }
+        }
+
+        function goHome() {
+            stopCamera();
+            window.location.href = '/';
+        }
+
+        // Limpar ao sair da página
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
