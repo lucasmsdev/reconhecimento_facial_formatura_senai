@@ -315,36 +315,23 @@
         }
 
         function speakName(nome) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-
-                const utterance = new SpeechSynthesisUtterance(nome);
-                utterance.lang = 'pt-BR';
-                utterance.rate = 0.85;
-                utterance.pitch = 1.1;
-                utterance.volume = 1;
-
-                const voices = window.speechSynthesis.getVoices();
-                const portugueseVoice = voices.find(voice =>
-                    voice.lang.includes('pt-BR') || voice.lang.includes('pt_BR')
-                );
-
-                if (portugueseVoice) {
-                    utterance.voice = portugueseVoice;
-                }
-
-                window.speechSynthesis.speak(utterance);
-
-                utterance.onend = () => {
-                    console.log('Fala concluida');
-                };
-
-                utterance.onerror = (event) => {
-                    console.error('Erro ao falar:', event.error);
-                };
-            } else {
-                console.warn('Web Speech API nao suportada neste navegador');
-            }
+            fetch(`/api/speak/${encodeURIComponent(nome)}`)
+                .then(response => {
+                    if (response.ok) {
+                        return response.blob();
+                    }
+                    throw new Error('Erro ao gerar áudio');
+                })
+                .then(blob => {
+                    const audioUrl = URL.createObjectURL(blob);
+                    const audio = new Audio(audioUrl);
+                    audio.play().catch(error => {
+                        console.error('Erro ao reproduzir áudio:', error);
+                    });
+                })
+                .catch(error => {
+                    console.error('Erro ao falar o nome:', error);
+                });
         }
 
         window.addEventListener('load', () => {

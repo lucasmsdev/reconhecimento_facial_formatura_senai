@@ -7,11 +7,15 @@ from typing import Dict, Set, Optional
 
 import cv2
 import numpy as np
+import requests
+from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
 from starlette.middleware.cors import CORSMiddleware
+
+load_dotenv()
 
 app = FastAPI(title="Sistema de Reconhecimento Facial")
 
@@ -43,6 +47,11 @@ CONFIDENCE_THRESHOLD = 0.6
 face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
+
+# ElevenLabs Configuration
+ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
+ELEVENLABS_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+ELEVENLABS_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
 
 
 def extract_face_features(image_array) -> Optional[np.ndarray]:
@@ -248,6 +257,39 @@ async def broadcast_to_telao(nome: str):
         telao_connections.discard(ws)
 
 
+def generate_audio_elevenlabs(nome: str) -> Optional[bytes]:
+    """Gera áudio com ElevenLabs para o nome do aluno."""
+    if not ELEVENLABS_API_KEY:
+        print("ELEVENLABS_API_KEY não configurada!")
+        return None
+
+    try:
+        headers = {
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json",
+        }
+
+        data = {
+            "text": nome,
+            "model_id": "eleven_multilingual_v2",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+            },
+        }
+
+        response = requests.post(ELEVENLABS_URL, json=data, headers=headers, timeout=10)
+
+        if response.status_code == 200:
+            return response.content
+        else:
+            print(f"Erro ElevenLabs: {response.status_code} - {response.text}")
+            return None
+    except Exception as e:
+        print(f"Erro ao gerar áudio: {e}")
+        return None
+
+
 @app.on_event("startup")
 async def startup_event():
     """Carrega as faces conhecidas ao iniciar o servidor."""
@@ -363,7 +405,6 @@ async def recognize(file: UploadFile = File(...)):
         nome = recognize_face(image_data)
 
         if nome and should_announce(nome):
-            # Broadcast para o telão
             await broadcast_to_telao(nome)
             return {"reconhecido": True, "nome": nome}
         elif nome:
@@ -373,6 +414,21 @@ async def recognize(file: UploadFile = File(...)):
     except Exception as e:
         print(f"Erro em /recognize: {e}")
         return {"erro": str(e)}, 500
+
+
+@app.get("/api/speak/{nome}")
+async def speak(nome: str):
+    """Gera áudio com ElevenLabs para o nome do aluno."""
+    audio_data = generate_audio_elevenlabs(nome)
+
+    if audio_data:
+        return StreamingResponse(
+            io.BytesIO(audio_data),
+            media_type="audio/mpeg",
+            headers={"Content-Disposition": f"inline; filename={nome}.mp3"},
+        )
+    else:
+        return {"erro": "Não foi possível gerar o áudio"}, 500
 
 
 @app.websocket("/ws/telao")
