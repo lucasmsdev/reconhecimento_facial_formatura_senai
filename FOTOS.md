@@ -2,7 +2,55 @@
 
 O sistema agora suporta múltiplas fotos por aluno para melhorar a precisão do reconhecimento facial.
 
-## Organização das Pastas
+## Usando AWS S3 (Recomendado)
+
+Se a variável `S3_BUCKET_NAME` estiver configurada no `.env`, o sistema busca as fotos e os áudios diretamente do bucket S3, ignorando a pasta local.
+
+### Estrutura no Bucket
+
+```
+s3://seu-bucket/
+└── alunos/
+    ├── João Silva/
+    │   ├── foto1.jpg
+    │   ├── foto2.jpg
+    │   ├── foto3.jpg
+    │   └── audio.mp3
+    ├── Maria Santos/
+    │   ├── foto1.jpg
+    │   ├── foto2.jpg
+    │   └── audio.mp3
+    └── Pedro Oliveira/
+        ├── foto1.jpg
+        ├── foto2.jpg
+        └── audio.mp3
+```
+
+- O nome da pasta dentro de `alunos/` é o nome do aluno, exatamente como será exibido e falado no telão.
+- Aceita `.jpg`, `.jpeg` e `.png` para as fotos.
+- O áudio deve se chamar exatamente `audio.mp3` (gerado com Amazon Polly, voz em português).
+- Todas as fotos e o áudio de cada aluno são baixados uma única vez, quando o servidor inicia (`python main.py`). Para atualizar alunos novos ou fotos alteradas, reinicie o servidor.
+
+### Configuração no `.env`
+
+```
+AWS_ACCESS_KEY_ID=sua_access_key
+AWS_SECRET_ACCESS_KEY=sua_secret_key
+AWS_DEFAULT_REGION=us-east-1
+S3_BUCKET_NAME=nome-do-seu-bucket
+```
+
+O usuário/role do IAM usado precisa de permissão de leitura no bucket (`s3:GetObject` e `s3:ListBucket`).
+
+### Sem AWS CLI configurado?
+
+Se preferir, ao invés de colocar `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` no `.env`, você pode rodar `aws configure` uma vez na máquina — o boto3 usa essas credenciais automaticamente e não precisa duplicar no `.env`.
+
+---
+
+## Usando Pasta Local (Alternativa)
+
+Se `S3_BUCKET_NAME` não estiver definido, o sistema volta a usar a pasta local `alunos_cadastrados/`.
 
 Você pode organizar as fotos de duas formas:
 

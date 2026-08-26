@@ -5,9 +5,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Set, Optional
 
+import boto3
 import cv2
 import numpy as np
-import requests
+from botocore.exceptions import ClientError, NoCredentialsError
 from dotenv import load_dotenv
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
@@ -36,7 +37,8 @@ ALUNOS_DIR = Path("alunos_cadastrados")
 ALUNOS_DIR.mkdir(exist_ok=True)
 
 # Global state
-student_face_images = {}  # {nome: [imagens processadas]}
+student_face_images = {}  # {nome: features}
+student_audio_cache: Dict[str, bytes] = {}  # {nome: audio mp3 bytes}
 telao_connections: Set[WebSocket] = set()
 last_recognized: Dict[str, datetime] = {}
 DEBOUNCE_SECONDS = 3
@@ -48,10 +50,12 @@ face_cascade = cv2.CascadeClassifier(
     cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
 )
 
-# ElevenLabs Configuration
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID = "lWq4KDY8znfkV0DrK8Vb"
-ELEVENLABS_URL = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
+# AWS S3 Configuration
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+AWS_REGION = os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+S3_PREFIX = "alunos/"
+
+s3_client = boto3.client("s3", region_name=AWS_REGION) if S3_BUCKET_NAME else None
 
 
 def extract_face_features(image_array) -> Optional[np.ndarray]:
@@ -94,7 +98,102 @@ def extract_face_features(image_array) -> Optional[np.ndarray]:
 
 
 def load_known_faces():
-    """Carrega as faces conhecidas da pasta de alunos cadastrados.
+    """Carrega as faces (e áudios) conhecidas.
+    Usa o bucket S3 se configurado, senão cai para a pasta local."""
+    if S3_BUCKET_NAME and s3_client:
+        load_known_faces_from_s3()
+    else:
+        load_known_faces_from_local()
+
+
+def load_known_faces_from_s3():
+    """Carrega fotos e áudios dos alunos a partir do bucket S3.
+    Estrutura esperada: alunos/<Nome do Aluno>/fotoN.jpg + audio.mp3"""
+    global student_face_images, student_audio_cache
+
+    student_face_images = {}
+    student_audio_cache = {}
+
+    students: Dict[str, Dict[str, list]] = {}
+
+    try:
+        paginator = s3_client.get_paginator("list_objects_v2")
+        pages = paginator.paginate(Bucket=S3_BUCKET_NAME, Prefix=S3_PREFIX)
+
+        for page in pages:
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                relative = key[len(S3_PREFIX):]
+                parts = relative.split("/")
+
+                if len(parts) != 2 or not parts[1]:
+                    continue
+
+                aluno_name, filename = parts
+                filename_lower = filename.lower()
+                entry = students.setdefault(aluno_name, {"photos": [], "audio": None})
+
+                if filename_lower.endswith((".jpg", ".jpeg", ".png")):
+                    entry["photos"].append(key)
+                elif filename_lower.endswith(".mp3"):
+                    entry["audio"] = key
+    except NoCredentialsError:
+        print("Credenciais AWS não encontradas! Configure AWS_ACCESS_KEY_ID e AWS_SECRET_ACCESS_KEY no .env")
+        return
+    except ClientError as e:
+        print(f"Erro ao listar objetos no bucket S3: {e}")
+        return
+
+    if not students:
+        print(f"Nenhum aluno encontrado em s3://{S3_BUCKET_NAME}/{S3_PREFIX}")
+        return
+
+    print(f"Carregando {len(students)} aluno(s) do bucket S3...")
+
+    for aluno_name, data in students.items():
+        print(f"\nAluno: {aluno_name}")
+
+        features_list = []
+        for key in data["photos"]:
+            try:
+                response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=key)
+                image_bytes = response["Body"].read()
+                image_array = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+
+                if image_array is None:
+                    print(f"  Erro ao decodificar: {key}")
+                    continue
+
+                features = extract_face_features(image_array)
+                if features is not None:
+                    features_list.append(features)
+                    print(f"  Carregado: {key}")
+                else:
+                    print(f"  Nenhum rosto detectado em: {key}")
+            except ClientError as e:
+                print(f"  Erro ao baixar {key}: {e}")
+
+        if features_list:
+            student_face_images[aluno_name] = np.mean(features_list, axis=0)
+            print(f"  Total de {len(features_list)} foto(s) carregada(s)")
+        else:
+            print(f"  Nenhuma foto valida para {aluno_name}")
+
+        if data["audio"]:
+            try:
+                response = s3_client.get_object(Bucket=S3_BUCKET_NAME, Key=data["audio"])
+                student_audio_cache[aluno_name] = response["Body"].read()
+                print(f"  Audio carregado: {data['audio']}")
+            except ClientError as e:
+                print(f"  Erro ao baixar audio {data['audio']}: {e}")
+        else:
+            print(f"  Nenhum audio.mp3 encontrado para {aluno_name}")
+
+    print(f"\nTotal de alunos carregados do S3: {len(student_face_images)}")
+
+
+def load_known_faces_from_local():
+    """Carrega as faces conhecidas da pasta local de alunos cadastrados.
     Busca por subpastas nomeadas com o nome do aluno."""
     global student_face_images
 
@@ -257,39 +356,6 @@ async def broadcast_to_telao(nome: str):
         telao_connections.discard(ws)
 
 
-def generate_audio_elevenlabs(nome: str) -> Optional[bytes]:
-    """Gera áudio com ElevenLabs para o nome do aluno."""
-    if not ELEVENLABS_API_KEY:
-        print("ELEVENLABS_API_KEY não configurada!")
-        return None
-
-    try:
-        headers = {
-            "xi-api-key": ELEVENLABS_API_KEY,
-            "Content-Type": "application/json",
-        }
-
-        data = {
-            "text": nome,
-            "model_id": "eleven_multilingual_v2",
-            "voice_settings": {
-                "stability": 0.5,
-                "similarity_boost": 0.75,
-            },
-        }
-
-        response = requests.post(ELEVENLABS_URL, json=data, headers=headers, timeout=10)
-
-        if response.status_code == 200:
-            return response.content
-        else:
-            print(f"Erro ElevenLabs: {response.status_code} - {response.text}")
-            return None
-    except Exception as e:
-        print(f"Erro ao gerar áudio: {e}")
-        return None
-
-
 @app.on_event("startup")
 async def startup_event():
     """Carrega as faces conhecidas ao iniciar o servidor."""
@@ -418,8 +484,8 @@ async def recognize(file: UploadFile = File(...)):
 
 @app.get("/api/speak/{nome}")
 async def speak(nome: str):
-    """Gera áudio com ElevenLabs para o nome do aluno."""
-    audio_data = generate_audio_elevenlabs(nome)
+    """Retorna o áudio (audio.mp3) do aluno, pré-gerado com Amazon Polly e cacheado do S3."""
+    audio_data = student_audio_cache.get(nome)
 
     if audio_data:
         return StreamingResponse(
@@ -428,7 +494,7 @@ async def speak(nome: str):
             headers={"Content-Disposition": f"inline; filename={nome}.mp3"},
         )
     else:
-        return {"erro": "Não foi possível gerar o áudio"}, 500
+        return {"erro": "Áudio não encontrado para este aluno"}, 404
 
 
 @app.websocket("/ws/telao")

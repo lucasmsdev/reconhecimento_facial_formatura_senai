@@ -18,6 +18,8 @@ def test_imports():
         'numpy': 'NumPy',
         'PIL': 'Pillow',
         'websockets': 'WebSockets',
+        'boto3': 'Boto3 (AWS)',
+        'dotenv': 'python-dotenv',
     }
 
     all_ok = True
