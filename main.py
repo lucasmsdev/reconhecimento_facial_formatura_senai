@@ -37,18 +37,27 @@ ALUNOS_DIR = Path("alunos_cadastrados")
 ALUNOS_DIR.mkdir(exist_ok=True)
 
 # Global state
-student_face_images = {}  # {nome: features}
+student_face_images: Dict[str, list] = {}  # {nome: [embeddings faciais]}
 student_audio_cache: Dict[str, bytes] = {}  # {nome: audio mp3 bytes}
 telao_connections: Set[WebSocket] = set()
 last_announcement_time: Optional[datetime] = None
 DEBOUNCE_SECONDS = 5
-CONFIDENCE_THRESHOLD = 0.6
+# Limiar de similaridade do SFace (cosseno). ~0.363 é o ponto de corte
+# recomendado pelo modelo; usamos uma margem um pouco maior para reduzir
+# falsos positivos entre pessoas diferentes.
+CONFIDENCE_THRESHOLD = 0.42
 
+# Modelos de detecção (YuNet) e reconhecimento facial (SFace) do OpenCV.
+# Substituem a comparação por histograma de cores, que não distinguia
+# pessoas diferentes de forma confiável.
+MODELS_DIR = Path("models")
+YUNET_MODEL_PATH = MODELS_DIR / "face_detection_yunet_2023mar.onnx"
+SFACE_MODEL_PATH = MODELS_DIR / "face_recognition_sface_2021dec.onnx"
 
-# Load Haar Cascade classifier para detecção de faces
-face_cascade = cv2.CascadeClassifier(
-    cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+face_detector = cv2.FaceDetectorYN_create(
+    str(YUNET_MODEL_PATH), "", (320, 320), 0.6, 0.3, 5000
 )
+face_recognizer = cv2.FaceRecognizerSF_create(str(SFACE_MODEL_PATH), "")
 
 # AWS S3 Configuration
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
@@ -58,42 +67,25 @@ S3_PREFIX = "alunos/"
 s3_client = boto3.client("s3", region_name=AWS_REGION) if S3_BUCKET_NAME else None
 
 
-def extract_face_features(image_array) -> Optional[np.ndarray]:
-    """Extrai features de um rosto usando OpenCV Haar Cascade."""
+def extract_face_embedding(image_array) -> Optional[np.ndarray]:
+    """Detecta o rosto principal da imagem e retorna seu embedding facial (SFace)."""
     try:
-        # Converter para escala de cinza
-        gray = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
+        height, width = image_array.shape[:2]
+        face_detector.setInputSize((width, height))
+        _, faces = face_detector.detect(image_array)
 
-        # Detectar rostos
-        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
-
-        if len(faces) == 0:
+        if faces is None or len(faces) == 0:
             return None
 
-        # Pegar o primeiro rosto detectado
-        x, y, w, h = faces[0]
+        # Pegar o rosto com maior confiança (última coluna do resultado)
+        best_face = max(faces, key=lambda f: f[-1])
 
-        # Extrair região do rosto
-        face_region = image_array[y : y + h, x : x + w]
+        aligned_face = face_recognizer.alignCrop(image_array, best_face)
+        embedding = face_recognizer.feature(aligned_face)
 
-        if face_region.size == 0:
-            return None
-
-        # Redimensionar para tamanho fixo para consistência
-        face_resized = cv2.resize(face_region, (224, 224))
-
-        # Criar um "fingerprint" simples usando histogramas
-        hist_b = cv2.calcHist([face_resized], [0], None, [32], [0, 256])
-        hist_g = cv2.calcHist([face_resized], [1], None, [32], [0, 256])
-        hist_r = cv2.calcHist([face_resized], [2], None, [32], [0, 256])
-
-        # Concatenar histogramas
-        features = np.concatenate([hist_b.flatten(), hist_g.flatten(), hist_r.flatten()])
-        features = features / (np.linalg.norm(features) + 1e-6)  # Normalizar
-
-        return features
+        return embedding
     except Exception as e:
-        print(f"Erro ao extrair features: {e}")
+        print(f"Erro ao extrair embedding facial: {e}")
         return None
 
 
@@ -164,9 +156,9 @@ def load_known_faces_from_s3():
                     print(f"  Erro ao decodificar: {key}")
                     continue
 
-                features = extract_face_features(image_array)
-                if features is not None:
-                    features_list.append(features)
+                embedding = extract_face_embedding(image_array)
+                if embedding is not None:
+                    features_list.append(embedding)
                     print(f"  Carregado: {key}")
                 else:
                     print(f"  Nenhum rosto detectado em: {key}")
@@ -174,7 +166,7 @@ def load_known_faces_from_s3():
                 print(f"  Erro ao baixar {key}: {e}")
 
         if features_list:
-            student_face_images[aluno_name] = np.mean(features_list, axis=0)
+            student_face_images[aluno_name] = features_list
             print(f"  Total de {len(features_list)} foto(s) carregada(s)")
         else:
             print(f"  Nenhuma foto valida para {aluno_name}")
@@ -228,9 +220,9 @@ def load_known_faces_from_local():
                     print(f"Erro ao ler: {image_path.name}")
                     continue
 
-                features = extract_face_features(image)
-                if features is not None:
-                    student_face_images[aluno_name] = features
+                embedding = extract_face_embedding(image)
+                if embedding is not None:
+                    student_face_images[aluno_name] = [embedding]
                     print(f"Carregado: {aluno_name}")
                 else:
                     print(f"Nenhum rosto detectado em: {image_path.name}")
@@ -263,9 +255,9 @@ def load_known_faces_from_local():
                         print(f"  Erro ao ler: {image_path.name}")
                         continue
 
-                    features = extract_face_features(image)
-                    if features is not None:
-                        features_list.append(features)
+                    embedding = extract_face_embedding(image)
+                    if embedding is not None:
+                        features_list.append(embedding)
                         print(f"  Carregado: {image_path.name}")
                     else:
                         print(f"  Nenhum rosto detectado em: {image_path.name}")
@@ -273,8 +265,7 @@ def load_known_faces_from_local():
                     print(f"  Erro ao processar {image_path.name}: {e}")
 
             if features_list:
-                # Usar a média de todas as features
-                student_face_images[aluno_name] = np.mean(features_list, axis=0)
+                student_face_images[aluno_name] = features_list
                 print(f"  Total de {len(features_list)} foto(s) carregada(s)")
             else:
                 print(f"  Nenhuma foto valida para {aluno_name}")
@@ -292,25 +283,26 @@ def recognize_face(image_data: bytes) -> Optional[str]:
         image = Image.open(io.BytesIO(image_data))
         image_array = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-        # Extrair features
-        face_features = extract_face_features(image_array)
+        # Extrair embedding do rosto detectado
+        face_embedding = extract_face_embedding(image_array)
 
-        if face_features is None:
+        if face_embedding is None:
             return None
 
-        # Comparar com rostos conhecidos
+        # Comparar com todas as fotos cadastradas de cada aluno,
+        # usando a maior similaridade encontrada (mais robusto que a média)
         best_match = None
         best_score = CONFIDENCE_THRESHOLD
 
-        for aluno_name, stored_features in student_face_images.items():
-            # Calcular similaridade (cosseno)
-            similarity = np.dot(face_features, stored_features) / (
-                np.linalg.norm(face_features) * np.linalg.norm(stored_features) + 1e-6
-            )
+        for aluno_name, stored_embeddings in student_face_images.items():
+            for stored_embedding in stored_embeddings:
+                similarity = face_recognizer.match(
+                    face_embedding, stored_embedding, cv2.FaceRecognizerSF_FR_COSINE
+                )
 
-            if similarity > best_score:
-                best_score = similarity
-                best_match = aluno_name
+                if similarity > best_score:
+                    best_score = similarity
+                    best_match = aluno_name
 
         return best_match
     except Exception as e:
