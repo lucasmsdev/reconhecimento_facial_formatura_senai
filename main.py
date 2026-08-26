@@ -40,8 +40,8 @@ ALUNOS_DIR.mkdir(exist_ok=True)
 student_face_images = {}  # {nome: features}
 student_audio_cache: Dict[str, bytes] = {}  # {nome: audio mp3 bytes}
 telao_connections: Set[WebSocket] = set()
-last_recognized: Dict[str, datetime] = {}
-DEBOUNCE_SECONDS = 3
+last_announcement_time: Optional[datetime] = None
+DEBOUNCE_SECONDS = 5
 CONFIDENCE_THRESHOLD = 0.6
 
 
@@ -318,19 +318,18 @@ def recognize_face(image_data: bytes) -> Optional[str]:
         return None
 
 
-def should_announce(nome: str) -> bool:
+def should_announce() -> bool:
     """
-    Verifica se o aluno deve ser anunciado (debounce).
+    Verifica se uma nova leitura pode ser anunciada.
+    Bloqueio global: após qualquer leitura, ignora novas leituras por
+    DEBOUNCE_SECONDS, independente de quem for reconhecido.
     """
+    global last_announcement_time
+
     now = datetime.now()
 
-    if nome not in last_recognized:
-        last_recognized[nome] = now
-        return True
-
-    last_time = last_recognized[nome]
-    if (now - last_time).total_seconds() >= DEBOUNCE_SECONDS:
-        last_recognized[nome] = now
+    if last_announcement_time is None or (now - last_announcement_time).total_seconds() >= DEBOUNCE_SECONDS:
+        last_announcement_time = now
         return True
 
     return False
@@ -474,7 +473,7 @@ async def recognize(file: UploadFile = File(...)):
         image_data = await file.read()
         nome = recognize_face(image_data)
 
-        if nome and should_announce(nome):
+        if nome and should_announce():
             await broadcast_to_telao(nome)
             return {"reconhecido": True, "nome": nome}
         elif nome:

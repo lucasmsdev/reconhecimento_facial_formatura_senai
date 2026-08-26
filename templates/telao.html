@@ -174,7 +174,7 @@
         }
 
         .history-item {
-            padding: 6px 0;
+            padding: 8px 0;
             color: #333;
         }
 
@@ -182,14 +182,7 @@
             border-top: 1px solid #f0f0f0;
         }
 
-        .history-item .time {
-            display: block;
-            font-size: 11px;
-            color: #999;
-        }
-
         .history-item .name {
-            display: block;
             font-weight: 600;
         }
 
@@ -275,8 +268,8 @@
 
         let ws = null;
         let recognizedStudents = [];
+        let seenNames = new Set();
         let displayTimeout = null;
-        let lastStudentName = null;
 
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -312,16 +305,14 @@
                 clearTimeout(displayTimeout);
             }
 
-            const now = new Date().toLocaleTimeString('pt-BR');
-
-            if (nome !== lastStudentName) {
-                recognizedStudents.unshift({ nome, time: now });
+            if (!seenNames.has(nome)) {
+                seenNames.add(nome);
+                recognizedStudents.unshift({ nome });
 
                 if (recognizedStudents.length > 5) {
                     recognizedStudents.pop();
                 }
 
-                lastStudentName = nome;
                 updateHistoryDisplay();
             }
 
@@ -356,7 +347,7 @@
 
             history.style.display = 'block';
             historyList.innerHTML = recognizedStudents
-                .map(item => `<div class="history-item"><span class="time">${item.time}</span><span class="name">${item.nome}</span></div>`)
+                .map(item => `<div class="history-item"><span class="name">${item.nome}</span></div>`)
                 .join('');
         }
 
