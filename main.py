@@ -371,73 +371,77 @@ async def root():
     <html>
     <head>
         <meta charset="utf-8">
-        <title>Sistema de Reconhecimento Facial</title>
+        <title>Formatura Senai Félix Guisard</title>
         <style>
+            * {
+                box-sizing: border-box;
+            }
             body {
-                font-family: Arial, sans-serif;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
                 display: flex;
+                flex-direction: column;
                 justify-content: center;
                 align-items: center;
-                height: 100vh;
+                min-height: 100vh;
                 margin: 0;
-                background: white;
+                background: #f5f5f5;
+                padding: 20px;
+            }
+            .logo {
+                max-width: 300px;
+                width: 60vw;
+                min-width: 180px;
+                height: auto;
+                border-radius: 6px;
+                box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
+                margin-bottom: 32px;
             }
             .container {
                 text-align: center;
                 background: white;
-                padding: 40px;
-                border: 3px solid #000;
-                border-radius: 10px;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                padding: 44px;
+                border-radius: 14px;
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
             }
             h1 {
                 color: #000;
-                margin-bottom: 30px;
-                border-bottom: 3px solid #c41e3a;
-                padding-bottom: 15px;
+                margin: 0 0 28px;
+                font-size: 26px;
+                font-weight: 700;
+                letter-spacing: -0.3px;
+                padding-bottom: 18px;
+                border-bottom: 2px solid #f0f0f0;
             }
             .buttons {
                 display: flex;
-                gap: 20px;
+                gap: 16px;
                 justify-content: center;
             }
             a {
                 display: inline-block;
-                padding: 15px 30px;
-                font-size: 16px;
+                padding: 14px 32px;
+                font-size: 15px;
                 text-decoration: none;
-                border-radius: 5px;
-                transition: transform 0.2s, box-shadow 0.2s;
-                border: 2px solid #000;
+                border-radius: 8px;
+                transition: all 0.2s ease;
                 font-weight: 600;
             }
-            .btn-camera {
+            .btn-camera, .btn-telao {
                 background: #c41e3a;
                 color: white;
-                border-color: #c41e3a;
+                box-shadow: 0 4px 12px rgba(196, 30, 58, 0.25);
             }
-            .btn-camera:hover {
-                background: white;
-                color: #c41e3a;
-            }
-            .btn-telao {
-                background: #c41e3a;
-                color: white;
-                border-color: #c41e3a;
-            }
-            .btn-telao:hover {
-                background: white;
-                color: #c41e3a;
-            }
-            a:hover {
+            .btn-camera:hover, .btn-telao:hover {
+                background: #a3182f;
                 transform: translateY(-2px);
-                box-shadow: 0 5px 15px rgba(196, 30, 58, 0.3);
+                box-shadow: 0 6px 16px rgba(196, 30, 58, 0.35);
             }
         </style>
     </head>
     <body>
+        <img class="logo" src="/static/logo-senai.png" alt="SENAI" onerror="this.style.display='none'">
         <div class="container">
-            <h1>Sistema de Reconhecimento Facial</h1>
+            <h1>Formatura Senai Félix Guisard</h1>
             <div class="buttons">
                 <a href="/camera" class="btn-camera">Câmera</a>
                 <a href="/telao" class="btn-telao">Telão</a>
